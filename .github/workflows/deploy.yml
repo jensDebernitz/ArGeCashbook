@@ -28,8 +28,8 @@ jobs:
         context: .
         push: true
         tags: |
-          jensdebernitz/kassenbuch:latest
-          jensdebernitz/kassenbuch:${{ github.sha }}
+          felixtimoberfell31/kassenbuch:latest
+          felixtimoberfell31/kassenbuch:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         
@@ -37,4 +37,4 @@ jobs:
       run: |
         curl -X POST "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
           -H "Content-Type: application/json" \
-          -d '{"image": "jensdebernitz/kassenbuch:${{ github.sha }}"}'
+          -d '{"image": "felixtimoberfell31/kassenbuch:${{ github.sha }}"}'

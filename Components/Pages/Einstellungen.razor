@@ -1,0 +1,205 @@
+@page "/einstellungen"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Einstellungen - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-gear me-2"></i>Einstellungen</h1>
+
+@if (_loading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else if (_einstellungen != null)
+{
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-building me-2"></i>Allgemein
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Organisationsname</label>
+                        <input type="text" class="form-control" @bind="_einstellungen.OrganisationsName" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="Speichern">
+                        <i class="bi bi-check-circle me-2"></i>Speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-danger text-white fw-bold">
+                    <i class="bi bi-shield-lock me-2"></i>Admin-Passwort
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Dieses Passwort wird benoetigt, um den Bedienungs-Modus zu verlassen.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">Aktuelles Passwort</label>
+                        <input type="password" class="form-control" @bind="_altesPasswort" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Neues Passwort</label>
+                        <input type="password" class="form-control" @bind="_neuesPasswort" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Neues Passwort bestaetigen</label>
+                        <input type="password" class="form-control" @bind="_neuesPasswortBestaetigung" />
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_passwortMeldung))
+                    {
+                        <div class="alert @(_passwortErfolg ? "alert-success" : "alert-danger") py-2">
+                            @_passwortMeldung
+                        </div>
+                    }
+
+                    <button class="btn btn-danger" @onclick="PasswortAendern">
+                        <i class="bi bi-key me-2"></i>Passwort ändern
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-calendar-check me-2"></i>Aktive Veranstaltung
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <select class="form-select" @bind="_selectedVeranstaltungId">
+                            <option value="">-- Keine --</option>
+                            @foreach (var v in _veranstaltungen)
+                            {
+                                <option value="@v.Id">@v.Name (@v.Datum.ToString("dd.MM.yyyy"))</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" @onclick="VeranstaltungSetzen">
+                        <i class="bi bi-check-circle me-2"></i>Aktive Veranstaltung setzen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-printer me-2"></i>Bondrucker (Vorbereitung)
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Die Bondrucker-Integration ist fuer eine zukuenftige Version geplant.
+                        Unterstuetzt werden ESC/POS-kompatible Thermodrucker ueber USB oder Netzwerk.
+                    </p>
+                    <div class="alert alert-info py-2">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Empfehlung: Epson TM-T20III oder vergleichbare ESC/POS Drucker.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_gespeichert)
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <div class="toast show bg-success text-white">
+                <div class="toast-body">
+                    <i class="bi bi-check-circle me-2"></i>Einstellungen gespeichert!
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private AppEinstellungen? _einstellungen;
+    private List<Veranstaltung> _veranstaltungen = new();
+    private int? _selectedVeranstaltungId;
+    private bool _gespeichert;
+
+    private string _altesPasswort = string.Empty;
+    private string _neuesPasswort = string.Empty;
+    private string _neuesPasswortBestaetigung = string.Empty;
+    private string? _passwortMeldung;
+    private bool _passwortErfolg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _einstellungen = await Db.GetEinstellungenAsync();
+        _veranstaltungen = await Db.GetVeranstaltungenAsync();
+        _selectedVeranstaltungId = _einstellungen.AktiveVeranstaltungId;
+        _loading = false;
+    }
+
+    private async Task Speichern()
+    {
+        if (_einstellungen == null) return;
+        await Db.UpdateAsync(_einstellungen);
+        _gespeichert = true;
+        StateHasChanged();
+        _ = HideMeldung();
+    }
+
+    private async Task VeranstaltungSetzen()
+    {
+        if (_einstellungen == null) return;
+        _einstellungen.AktiveVeranstaltungId = _selectedVeranstaltungId;
+        await Db.UpdateAsync(_einstellungen);
+        _gespeichert = true;
+        StateHasChanged();
+        _ = HideMeldung();
+    }
+
+    private async Task PasswortAendern()
+    {
+        if (_einstellungen == null) return;
+
+        if (_altesPasswort != _einstellungen.AdminPasswort)
+        {
+            _passwortMeldung = "Aktuelles Passwort ist falsch!";
+            _passwortErfolg = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_neuesPasswort))
+        {
+            _passwortMeldung = "Neues Passwort darf nicht leer sein!";
+            _passwortErfolg = false;
+            return;
+        }
+
+        if (_neuesPasswort != _neuesPasswortBestaetigung)
+        {
+            _passwortMeldung = "Passwoerter stimmen nicht ueberein!";
+            _passwortErfolg = false;
+            return;
+        }
+
+        _einstellungen.AdminPasswort = _neuesPasswort;
+        await Db.UpdateAsync(_einstellungen);
+
+        _altesPasswort = string.Empty;
+        _neuesPasswort = string.Empty;
+        _neuesPasswortBestaetigung = string.Empty;
+        _passwortMeldung = "Passwort erfolgreich geaendert!";
+        _passwortErfolg = true;
+    }
+
+    private async Task HideMeldung()
+    {
+        await Task.Delay(3000);
+        _gespeichert = false;
+        await InvokeAsync(StateHasChanged);
+    }
+}

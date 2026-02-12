@@ -1,0 +1,245 @@
+@page "/safebags"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>SafeBags - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-safe me-2"></i>SafeBags</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-warning text-dark">
+                <div class="card-body text-center">
+                    <div class="small">SafeBags im Tresor</div>
+                    <div class="fs-2 fw-bold">@_safeBags.Count(s => s.ImTresor)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="small">Gesamtbetrag im Tresor</div>
+                    <div class="fs-2 fw-bold">@_safeBags.Where(s => s.ImTresor).Sum(s => s.Betrag).ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-secondary text-white">
+                <div class="card-body text-center">
+                    <div class="small">SafeBags gesamt</div>
+                    <div class="fs-2 fw-bold">@_safeBags.Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-5 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-plus-circle me-2"></i>Neuer SafeBag
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 p-3 rounded" style="background:#e8f5e9;border:2px dashed #4caf50;">
+                        <div class="small text-muted mb-1">SafeBag-Nummer (bitte auf den Beutel schreiben)</div>
+                        <div class="fs-3 fw-bold text-success">@_naechsteNummer</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Verkaufsstand</label>
+                        <select class="form-select" @bind="_neuerStandId">
+                            <option value="">-- Stand waehlen --</option>
+                            @foreach (var stand in _staende)
+                            {
+                                <option value="@stand.Id">@stand.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Kasseninhalt (gezaehlt)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control form-control-lg" step="0.01" min="0" @bind="_kasseninhalt" />
+                            <span class="input-group-text">EUR</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Wechselgeld (Startbetrag der Kasse)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" step="0.01" min="0" @bind="_wechselgeld" />
+                            <span class="input-group-text">EUR</span>
+                        </div>
+                    </div>
+                    <div class="mb-3 p-3 rounded" style="background:#e3f2fd;">
+                        <div class="small text-muted">Einzahlungsbetrag (Kasseninhalt - Wechselgeld)</div>
+                        <div class="fs-3 fw-bold @(_einzahlung >= 0 ? "text-primary" : "text-danger")">@_einzahlung.ToString("C", _culture)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Erstellt von / Aufsicht</label>
+                        <input type="text" class="form-control" @bind="_neuerErstelltVon" placeholder="Name der Aufsicht" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bemerkung</label>
+                        <input type="text" class="form-control" @bind="_neueBemerkung" />
+                    </div>
+                    <button class="btn btn-primary w-100 btn-lg" @onclick="Erstellen"
+                            disabled="@(_einzahlung <= 0 || _neuerStandId == null)">
+                        <i class="bi bi-safe me-2"></i>SafeBag erstellen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-list-ul me-2"></i>SafeBag-Uebersicht
+                </div>
+                <div class="card-body p-0">
+                    @if (!_safeBags.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine SafeBags.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Zeit</th>
+                                        <th>Stand</th>
+                                        <th class="text-end">Kasse</th>
+                                        <th class="text-end">Wechselg.</th>
+                                        <th class="text-end">Einzahlung</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var sb in _safeBags.OrderByDescending(x => x.ErstelltAm))
+                                    {
+                                        var standName = _staende.FirstOrDefault(s => s.Id == sb.VerkaufsstandId)?.Name ?? "-";
+                                        <tr>
+                                            <td><span class="badge bg-dark">@sb.Nummer</span></td>
+                                            <td>@sb.ErstelltAm.ToString("dd.MM. HH:mm")</td>
+                                            <td>@standName</td>
+                                            <td class="text-end">@sb.Kasseninhalt.ToString("C", _culture)</td>
+                                            <td class="text-end">@sb.Wechselgeld.ToString("C", _culture)</td>
+                                            <td class="text-end fw-bold">@sb.Betrag.ToString("C", _culture)</td>
+                                            <td>
+                                                @if (sb.ImTresor)
+                                                {
+                                                    <span class="badge bg-success">Im Tresor</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Entnommen</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                @if (sb.ImTresor)
+                                                {
+                                                    <button class="btn btn-outline-warning btn-sm" @onclick="() => Entnehmen(sb)">
+                                                        <i class="bi bi-box-arrow-up"></i> Entnehmen
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<SafeBag> _safeBags = new();
+    private List<Verkaufsstand> _staende = new();
+
+    private string _naechsteNummer = "";
+    private decimal _kasseninhalt;
+    private decimal _wechselgeld;
+    private decimal _einzahlung => Math.Max(0, _kasseninhalt - _wechselgeld);
+    private int? _neuerStandId;
+    private string? _neuerErstelltVon;
+    private string? _neueBemerkung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+        _staende = (await Db.GetVerkaufsstaendeAsync()).Where(s => s.Aktiv).ToList();
+        await LadeDaten();
+        GeneriereNaechsteNummer();
+    }
+
+    private void GeneriereNaechsteNummer()
+    {
+        var maxNr = _safeBags.Count > 0
+            ? _safeBags.Max(s => s.Id)
+            : 0;
+        _naechsteNummer = $"SB-{(maxNr + 1):D5}";
+    }
+
+    private async Task LadeDaten()
+    {
+        if (_aktiveVeranstaltung == null) return;
+        _safeBags = await Db.GetSafeBagsAsync(_aktiveVeranstaltung.Id);
+    }
+
+    private async Task Erstellen()
+    {
+        if (_aktiveVeranstaltung == null || _einzahlung <= 0 || _neuerStandId == null) return;
+
+        var safeBag = new SafeBag
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            Nummer = _naechsteNummer,
+            Kasseninhalt = _kasseninhalt,
+            Wechselgeld = _wechselgeld,
+            Betrag = _einzahlung,
+            VerkaufsstandId = _neuerStandId,
+            ErstelltVon = _neuerErstelltVon,
+            Bemerkung = _neueBemerkung,
+            ErstelltAm = DateTime.Now,
+            ImTresor = true
+        };
+
+        await Db.AddAsync(safeBag);
+
+        // Nummer mit tatsaechlicher DB-Id aktualisieren (fuer Eindeutigkeit)
+        safeBag.Nummer = $"SB-{safeBag.Id:D5}";
+        await Db.UpdateAsync(safeBag);
+
+        _kasseninhalt = 0;
+        _wechselgeld = 0;
+        _neuerStandId = null;
+        _neuerErstelltVon = null;
+        _neueBemerkung = null;
+
+        await LadeDaten();
+        GeneriereNaechsteNummer();
+    }
+
+    private async Task Entnehmen(SafeBag sb)
+    {
+        sb.ImTresor = false;
+        await Db.UpdateAsync(sb);
+        await LadeDaten();
+    }
+}

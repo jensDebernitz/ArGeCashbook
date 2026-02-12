@@ -1,0 +1,226 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>ArGe Kassenbuch - Dashboard</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
+
+@if (_loading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Laden...</span>
+        </div>
+    </div>
+}
+else
+{
+    @if (_aktiveVeranstaltung != null)
+    {
+        <div class="alert alert-success d-flex align-items-center mb-4">
+            <i class="bi bi-calendar-check me-2 fs-4"></i>
+            <div>
+                <strong>Aktive Veranstaltung:</strong> @_aktiveVeranstaltung.Name
+                <span class="text-muted ms-2">(@_aktiveVeranstaltung.Datum.ToString("dd.MM.yyyy"))</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning d-flex align-items-center mb-4">
+            <i class="bi bi-exclamation-triangle me-2 fs-4"></i>
+            <div>Keine aktive Veranstaltung ausgewählt. Bitte unter <a href="veranstaltungen">Veranstaltungen</a> eine Veranstaltung aktivieren.</div>
+        </div>
+    }
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-receipt fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Bons heute</div>
+                            <div class="fs-4 fw-bold">@_anzahlBons</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-cash fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Einnahmen</div>
+                            <div class="fs-4 fw-bold">@_einnahmen.ToString("C", _culture)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-safe fs-4 text-warning"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">SafeBags im Tresor</div>
+                            <div class="fs-4 fw-bold">@_anzahlSafeBags</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-coin fs-4 text-info"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Wechselgeld ausgegeben</div>
+                            <div class="fs-4 fw-bold">@_wechselgeldAusgegeben.ToString("C", _culture)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 fw-bold">
+                    <i class="bi bi-clock-history me-2"></i>Letzte Bons
+                </div>
+                <div class="card-body p-0">
+                    @if (_letzteBons.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Zeit</th>
+                                        <th class="text-end">Betrag</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var bon in _letzteBons)
+                                    {
+                                        <tr>
+                                            <td><span class="badge bg-secondary">@bon.BonNummer</span></td>
+                                            <td>@bon.ErstelltAm.ToString("HH:mm")</td>
+                                            <td class="text-end fw-bold">@bon.Gesamtbetrag.ToString("C", _culture)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Bons vorhanden</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 fw-bold">
+                    <i class="bi bi-arrow-left-right me-2"></i>Letzte Übergaben
+                </div>
+                <div class="card-body p-0">
+                    @if (_letzteUebergaben.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Zeit</th>
+                                        <th>Von → An</th>
+                                        <th>SafeBags</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var u in _letzteUebergaben)
+                                    {
+                                        <tr>
+                                            <td>@u.Zeitpunkt.ToString("HH:mm")</td>
+                                            <td>@u.UebergebenVon → @u.UebergebenAn</td>
+                                            <td><span class="badge bg-warning text-dark">@u.AnzahlSafeBags</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Übergaben vorhanden</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private bool _loading = true;
+    private Veranstaltung? _aktiveVeranstaltung;
+    private int _anzahlBons;
+    private decimal _einnahmen;
+    private int _anzahlSafeBags;
+    private decimal _wechselgeldAusgegeben;
+    private List<Bon> _letzteBons = new();
+    private List<Uebergabeprotokoll> _letzteUebergaben = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var einstellungen = await Db.GetEinstellungenAsync();
+            if (einstellungen.AktiveVeranstaltungId.HasValue)
+            {
+                _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+
+                if (_aktiveVeranstaltung != null)
+                {
+                    var vid = _aktiveVeranstaltung.Id;
+                    var bons = await Db.GetBonsAsync(vid);
+                    _anzahlBons = bons.Count(b => !b.Storniert);
+                    _einnahmen = bons.Where(b => !b.Storniert).Sum(b => b.Gesamtbetrag);
+                    _letzteBons = bons.Where(b => !b.Storniert).OrderByDescending(b => b.ErstelltAm).Take(5).ToList();
+
+                    var safeBags = await Db.GetSafeBagsAsync(vid);
+                    _anzahlSafeBags = safeBags.Count(s => s.ImTresor);
+
+                    var wechselgeld = await Db.GetWechselgeldAsync(vid);
+                    _wechselgeldAusgegeben = wechselgeld.Where(w => w.Aktion == WechselgeldAktion.Ausgabe).Sum(w => w.Betrag);
+
+                    _letzteUebergaben = (await Db.GetUebergabeprotokolleAsync(vid))
+                        .OrderByDescending(u => u.Zeitpunkt).Take(5).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Dashboard Fehler: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,400 @@
+@page "/veranstaltungen"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Veranstaltungen - ArGe Kassenbuch</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Veranstaltungen</h1>
+    <button class="btn btn-primary" @onclick="NeuAnlegen">
+        <i class="bi bi-plus-lg me-1"></i>Neue Veranstaltung
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <span class="fw-bold">Alle Veranstaltungen</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else if (!_veranstaltungen.Any())
+        {
+            <div class="text-muted text-center py-4">Noch keine Veranstaltungen angelegt.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Typ</th>
+                            <th>Datum</th>
+                            <th>Vereine</th>
+                            <th>Status</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var v in _veranstaltungen.OrderByDescending(x => x.Datum))
+                        {
+                            var istAktiv = _einstellungen?.AktiveVeranstaltungId == v.Id;
+                            <tr class="@(istAktiv ? "table-success" : "")">
+                                <td class="fw-bold">
+                                    @v.Name
+                                    @if (istAktiv)
+                                    {
+                                        <span class="badge bg-success ms-2">AKTIV</span>
+                                    }
+                                </td>
+                                <td><span class="badge bg-info">@v.Typ</span></td>
+                                <td>
+                                    @v.Datum.ToString("dd.MM.yyyy")
+                                    @if (v.DatumBis.HasValue)
+                                    {
+                                        <span> - @v.DatumBis.Value.ToString("dd.MM.yyyy")</span>
+                                    }
+                                </td>
+                                <td>
+                                    @foreach (var vv in v.VeranstaltungVereine)
+                                    {
+                                        var vereinObj = _vereine.FirstOrDefault(vr => vr.Id == vv.VereinId);
+                                        <span class="badge bg-secondary me-1">@(vereinObj?.Kuerzel ?? "?")</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (v.Aktiv)
+                                    {
+                                        <span class="badge bg-success">Aktiv</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Abgeschlossen</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (!istAktiv)
+                                    {
+                                        <button class="btn btn-success btn-sm me-1" @onclick="() => Aktivieren(v)" title="Als aktive Veranstaltung setzen">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(v)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(v)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(15,15,35,0.6); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-gradient">
+                    <h5 class="modal-title"><i class="bi bi-calendar-event me-2"></i>@(_editId > 0 ? "Veranstaltung bearbeiten" : "Neue Veranstaltung")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editVeranstaltung" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name</label>
+                                <InputText class="form-control" @bind-Value="_editVeranstaltung!.Name" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Typ</label>
+                                <InputSelect class="form-select" @bind-Value="_editVeranstaltung!.Typ">
+                                    @foreach (var typ in Enum.GetValues<VeranstaltungsTyp>())
+                                    {
+                                        <option value="@typ">@typ</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Datum von</label>
+                                <InputDate class="form-control" @bind-Value="_editVeranstaltung!.Datum" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Datum bis (optional)</label>
+                                <InputDate class="form-control" @bind-Value="_editVeranstaltung!.DatumBis" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Teilnehmende Vereine</label>
+                            @foreach (var verein in _vereine)
+                            {
+                                var vid = verein.Id;
+                                var vname = $"{verein.Name} ({verein.Kuerzel})";
+                                var selected = _selectedVereine.ContainsKey(vid) && _selectedVereine[vid];
+                                <div class="form-check" @onclick="() => ToggleVerein(vid)">
+                                    <div style="width:1.2em; height:1.2em; border: 2px solid #adb5bd; border-radius: .25em; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; @(selected ? "background-color:#0d6efd; border-color:#0d6efd;" : "")">
+                                        @if (selected)
+                                        {
+                                            <i class="bi bi-check text-white" style="font-size:0.9em;"></i>
+                                        }
+                                    </div>
+                                    <label class="form-check-label ms-1" style="cursor:pointer;">@vname</label>
+                                </div>
+                            }
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bemerkung</label>
+                            <InputText class="form-control" @bind-Value="_editVeranstaltung!.Bemerkung" />
+                        </div>
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input" @bind-Value="_editVeranstaltung!.Aktiv" />
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+
+                        <div class="border rounded p-3" style="background:#f8f9fa;">
+                            <div class="fw-bold mb-2"><i class="bi bi-cash-coin me-2"></i>Bargeld-Startbestand (Tresor)</div>
+                            <div class="small text-muted mb-3">Erfassen Sie die Stueckelungen des Startkapitals im Tresor.</div>
+                            @if (_startBestand.Any())
+                            {
+                                <table class="table table-sm mb-2">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Bezeichnung</th>
+                                            <th class="text-end">Wert</th>
+                                            <th class="text-center">Anzahl</th>
+                                            <th class="text-end">Gesamt</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var sb in _startBestand)
+                                        {
+                                            <tr>
+                                                <td>@sb.Stueckelung</td>
+                                                <td class="text-end">@sb.Wert.ToString("C", _culture)</td>
+                                                <td class="text-center">@sb.Anzahl</td>
+                                                <td class="text-end fw-bold">@((sb.Wert * sb.Anzahl).ToString("C", _culture))</td>
+                                                <td class="text-end">
+                                                    <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1" @onclick="() => _startBestand.Remove(sb)">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="table-success">
+                                            <td colspan="3" class="fw-bold">Gesamt</td>
+                                            <td class="text-end fw-bold">@_startBestand.Sum(s => s.Wert * s.Anzahl).ToString("C", _culture)</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            }
+                            <div class="row g-2 align-items-end">
+                                <div class="col">
+                                    <input type="text" class="form-control form-control-sm" @bind="_sbBezeichnung" placeholder="z.B. 1 EUR Muenzrolle" />
+                                </div>
+                                <div class="col-3">
+                                    <input type="number" class="form-control form-control-sm" step="0.01" min="0" @bind="_sbWert" placeholder="Wert" />
+                                </div>
+                                <div class="col-2">
+                                    <input type="number" class="form-control form-control-sm" min="1" @bind="_sbAnzahl" placeholder="Anz." />
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-success btn-sm" @onclick="StartBestandHinzufuegen"
+                                            disabled="@(string.IsNullOrWhiteSpace(_sbBezeichnung) || _sbWert <= 0)">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Veranstaltung> _veranstaltungen = new();
+    private List<Verein> _vereine = new();
+    private AppEinstellungen? _einstellungen;
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private bool _showForm;
+    private Veranstaltung? _editVeranstaltung;
+    private int _editId;
+    private Dictionary<int, bool> _selectedVereine = new();
+
+    private List<StartBestandZeile> _startBestand = new();
+    private string _sbBezeichnung = string.Empty;
+    private decimal _sbWert;
+    private int _sbAnzahl = 1;
+
+    private class StartBestandZeile
+    {
+        public string Stueckelung { get; set; } = "";
+        public decimal Wert { get; set; }
+        public int Anzahl { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        _loading = true;
+        _veranstaltungen = await Db.GetVeranstaltungenAsync();
+        _vereine = await Db.GetVereineAsync();
+        _einstellungen = await Db.GetEinstellungenAsync();
+        _loading = false;
+    }
+
+    private void InitSelectedVereine(List<int>? vorhandene = null)
+    {
+        _selectedVereine = new Dictionary<int, bool>();
+        foreach (var v in _vereine)
+            _selectedVereine[v.Id] = vorhandene?.Contains(v.Id) == true;
+    }
+
+    private void NeuAnlegen()
+    {
+        _editVeranstaltung = new Veranstaltung { Aktiv = true, Datum = DateTime.Today };
+        _editId = 0;
+        InitSelectedVereine();
+        _startBestand = new();
+        _sbBezeichnung = string.Empty;
+        _sbWert = 0;
+        _sbAnzahl = 1;
+        _showForm = true;
+    }
+
+    private async Task Bearbeiten(Veranstaltung v)
+    {
+        _editVeranstaltung = new Veranstaltung
+        {
+            Id = v.Id,
+            Name = v.Name,
+            Typ = v.Typ,
+            Datum = v.Datum,
+            DatumBis = v.DatumBis,
+            Bemerkung = v.Bemerkung,
+            Aktiv = v.Aktiv
+        };
+        _editId = v.Id;
+        InitSelectedVereine(v.VeranstaltungVereine.Select(vv => vv.VereinId).ToList());
+        var existingBestand = await Db.GetTresorBestandAsync(v.Id);
+        _startBestand = existingBestand.Select(b => new StartBestandZeile
+        {
+            Stueckelung = b.Stueckelung,
+            Wert = b.Wert,
+            Anzahl = b.Anzahl
+        }).ToList();
+        _showForm = true;
+    }
+
+    private void StartBestandHinzufuegen()
+    {
+        if (string.IsNullOrWhiteSpace(_sbBezeichnung) || _sbWert <= 0) return;
+        _startBestand.Add(new StartBestandZeile
+        {
+            Stueckelung = _sbBezeichnung,
+            Wert = _sbWert,
+            Anzahl = _sbAnzahl > 0 ? _sbAnzahl : 1
+        });
+        _sbBezeichnung = string.Empty;
+        _sbWert = 0;
+        _sbAnzahl = 1;
+    }
+
+    private void ToggleVerein(int vereinId)
+    {
+        if (_selectedVereine.ContainsKey(vereinId))
+            _selectedVereine[vereinId] = !_selectedVereine[vereinId];
+    }
+
+    private async Task Speichern()
+    {
+        if (_editVeranstaltung == null) return;
+        var vereinIds = _selectedVereine.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
+        if (_editId > 0)
+        {
+            await Db.UpdateVeranstaltungAsync(_editVeranstaltung, vereinIds);
+            await SpeichereTresorBestand(_editVeranstaltung.Id);
+        }
+        else
+        {
+            await Db.CreateVeranstaltungAsync(_editVeranstaltung, vereinIds);
+            await SpeichereTresorBestand(_editVeranstaltung.Id);
+
+            if (_startBestand.Any())
+            {
+                var gesamtStartkapital = _startBestand.Sum(s => s.Wert * s.Anzahl);
+                await Db.AddAsync(new TresorBewegung
+                {
+                    VeranstaltungId = _editVeranstaltung.Id,
+                    Typ = TresorBewegungTyp.Einzahlung,
+                    Betrag = gesamtStartkapital,
+                    Verwendungszweck = "Startkapital",
+                    Bemerkung = $"Bargeld-Startbestand bei Veranstaltungserstellung",
+                    Zeitpunkt = DateTime.Now
+                });
+            }
+        }
+        _showForm = false;
+        await LadeDaten();
+    }
+
+    private async Task SpeichereTresorBestand(int veranstaltungId)
+    {
+        var existing = await Db.GetTresorBestandAsync(veranstaltungId);
+        foreach (var e in existing)
+            await Db.DeleteAsync<TresorBestand>(e.Id);
+
+        foreach (var sb in _startBestand)
+        {
+            await Db.AddAsync(new TresorBestand
+            {
+                VeranstaltungId = veranstaltungId,
+                Stueckelung = sb.Stueckelung,
+                Wert = sb.Wert,
+                Anzahl = sb.Anzahl
+            });
+        }
+    }
+
+    private async Task Aktivieren(Veranstaltung v)
+    {
+        if (_einstellungen == null) return;
+        _einstellungen.AktiveVeranstaltungId = v.Id;
+        await Db.UpdateAsync(_einstellungen);
+        await LadeDaten();
+    }
+
+    private async Task Loeschen(Veranstaltung v)
+    {
+        await Db.DeleteVeranstaltungAsync(v.Id);
+        await LadeDaten();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

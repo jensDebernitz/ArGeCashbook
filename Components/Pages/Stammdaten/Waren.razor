@@ -1,0 +1,194 @@
+@page "/stammdaten/waren"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Waren und Preise - ArGe Kassenbuch</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-box-seam me-2"></i>Waren &amp; Preise</h1>
+    <button class="btn btn-primary" @onclick="NeuAnlegen">
+        <i class="bi bi-plus-lg me-1"></i>Neue Ware
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <span class="fw-bold">Warenartikel nach Stand</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else if (!_waren.Any())
+        {
+            <div class="text-muted text-center py-4">Noch keine Waren angelegt. Bitte zuerst Verkaufsstaende anlegen.</div>
+        }
+        else
+        {
+            @foreach (var gruppe in _warenNachStand)
+            {
+                <div class="px-3 py-2 bg-light border-bottom fw-bold">
+                    <i class="bi bi-shop me-1"></i>@gruppe.Key
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Artikel</th>
+                                <th class="text-end">Preis</th>
+                                <th>Status</th>
+                                <th class="text-end">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ware in gruppe.Value)
+                            {
+                                <tr>
+                                    <td>@ware.Name</td>
+                                    <td class="text-end fw-bold">@ware.Preis.ToString("C", _culture)</td>
+                                    <td>
+                                        @if (ware.Aktiv)
+                                        {
+                                            <span class="badge bg-success">Aktiv</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Inaktiv</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(ware)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(ware)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(15,15,35,0.6); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-gradient">
+                    <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>@(_editWare?.Id > 0 ? "Ware bearbeiten" : "Neue Ware")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editWare" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Artikelname</label>
+                            <InputText class="form-control" @bind-Value="_editWare!.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Preis</label>
+                            <InputNumber class="form-control" @bind-Value="_editWare!.Preis" step="0.10" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Verkaufsstand</label>
+                            <InputSelect class="form-select" @bind-Value="_editWare!.VerkaufsstandId">
+                                <option value="">-- Bitte waehlen --</option>
+                                @foreach (var stand in _staende)
+                                {
+                                    <option value="@stand.Id">@stand.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_editWare!.Aktiv" />
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private bool _loading = true;
+    private List<Ware> _waren = new();
+    private List<Verkaufsstand> _staende = new();
+    private Dictionary<string, List<Ware>> _warenNachStand = new();
+    private bool _showForm;
+    private Ware? _editWare;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        _loading = true;
+        _waren = await Db.GetWarenAsync();
+        _staende = await Db.GetVerkaufsstaendeAsync();
+
+        _warenNachStand = _waren
+            .GroupBy(w =>
+            {
+                var stand = _staende.FirstOrDefault(s => s.Id == w.VerkaufsstandId);
+                return stand?.Name ?? "Ohne Stand";
+            })
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        _loading = false;
+    }
+
+    private void NeuAnlegen()
+    {
+        _editWare = new Ware { Aktiv = true };
+        _showForm = true;
+    }
+
+    private void Bearbeiten(Ware ware)
+    {
+        _editWare = new Ware
+        {
+            Id = ware.Id,
+            Name = ware.Name,
+            Preis = ware.Preis,
+            VerkaufsstandId = ware.VerkaufsstandId,
+            WarengruppeId = ware.WarengruppeId,
+            Aktiv = ware.Aktiv
+        };
+        _showForm = true;
+    }
+
+    private async Task Speichern()
+    {
+        if (_editWare == null) return;
+        if (_editWare.Id > 0)
+            await Db.UpdateAsync(_editWare);
+        else
+            await Db.AddAsync(_editWare);
+        _showForm = false;
+        await LadeDaten();
+    }
+
+    private async Task Loeschen(Ware ware)
+    {
+        if (ware.Id == 0) return;
+        await Db.DeleteAsync<Ware>(ware.Id);
+        await LadeDaten();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

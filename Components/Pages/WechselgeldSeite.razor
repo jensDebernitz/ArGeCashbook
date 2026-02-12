@@ -1,0 +1,212 @@
+@page "/wechselgeld"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Wechselgeld - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-coin me-2"></i>Wechselgeld</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body text-center">
+                    <div class="small">Wechselgeld ausgegeben</div>
+                    <div class="fs-2 fw-bold">@_ausgegeben.ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="small">Wechselgeld zurueck</div>
+                    <div class="fs-2 fw-bold">@_zurueck.ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-warning text-dark">
+                <div class="card-body text-center">
+                    <div class="small">Noch im Umlauf</div>
+                    <div class="fs-2 fw-bold">@(_ausgegeben - _zurueck).ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-5 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-plus-circle me-2"></i>Wechselgeld buchen
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Aktion</label>
+                        <select class="form-select" @bind="_neueAktion">
+                            <option value="@WechselgeldAktion.Ausgabe">Ausgabe (an Bedienung/Stand)</option>
+                            <option value="@WechselgeldAktion.Ruecknahme">Ruecknahme (von Bedienung/Stand)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Betrag</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control form-control-lg" step="0.01" min="0" @bind="_neuerBetrag" />
+                            <span class="input-group-text">EUR</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bedienung (optional)</label>
+                        <select class="form-select" @bind="_neueBedienungId">
+                            <option value="">-- keine --</option>
+                            @foreach (var bed in _bedienungen)
+                            {
+                                <option value="@bed.Id">@bed.VollerName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Verkaufsstand (optional)</label>
+                        <select class="form-select" @bind="_neuerStandId">
+                            <option value="">-- keiner --</option>
+                            @foreach (var stand in _staende)
+                            {
+                                <option value="@stand.Id">@stand.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Empfaenger/Name</label>
+                        <input type="text" class="form-control" @bind="_neuerEmpfaenger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bemerkung</label>
+                        <input type="text" class="form-control" @bind="_neueBemerkung" />
+                    </div>
+                    <button class="btn btn-primary w-100" @onclick="Buchen" disabled="@(_neuerBetrag <= 0)">
+                        <i class="bi bi-check-circle me-2"></i>Buchen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-list-ul me-2"></i>Wechselgeld-Buchungen
+                </div>
+                <div class="card-body p-0">
+                    @if (!_buchungen.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Buchungen.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Zeit</th>
+                                        <th>Aktion</th>
+                                        <th>Empfaenger</th>
+                                        <th class="text-end">Betrag</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var b in _buchungen.OrderByDescending(x => x.Zeitpunkt))
+                                    {
+                                        <tr>
+                                            <td>@b.Zeitpunkt.ToString("dd.MM. HH:mm")</td>
+                                            <td>
+                                                @if (b.Aktion == WechselgeldAktion.Ausgabe)
+                                                {
+                                                    <span class="badge bg-danger">Ausgabe</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">Ruecknahme</span>
+                                                }
+                                            </td>
+                                            <td>@(b.EmpfaengerName ?? "-")</td>
+                                            <td class="text-end fw-bold">@b.Betrag.ToString("C", _culture)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<Wechselgeld> _buchungen = new();
+    private List<Bedienung> _bedienungen = new();
+    private List<Verkaufsstand> _staende = new();
+    private decimal _ausgegeben;
+    private decimal _zurueck;
+
+    private WechselgeldAktion _neueAktion = WechselgeldAktion.Ausgabe;
+    private decimal _neuerBetrag;
+    private int? _neueBedienungId;
+    private int? _neuerStandId;
+    private string? _neuerEmpfaenger;
+    private string? _neueBemerkung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+        _bedienungen = (await Db.GetBedienungenAsync()).Where(b => b.Aktiv).ToList();
+        _staende = (await Db.GetVerkaufsstaendeAsync()).Where(s => s.Aktiv).ToList();
+        await LadeBuchungen();
+    }
+
+    private async Task LadeBuchungen()
+    {
+        if (_aktiveVeranstaltung == null) return;
+        _buchungen = await Db.GetWechselgeldAsync(_aktiveVeranstaltung.Id);
+        _ausgegeben = _buchungen.Where(b => b.Aktion == WechselgeldAktion.Ausgabe).Sum(b => b.Betrag);
+        _zurueck = _buchungen.Where(b => b.Aktion == WechselgeldAktion.Ruecknahme).Sum(b => b.Betrag);
+    }
+
+    private async Task Buchen()
+    {
+        if (_aktiveVeranstaltung == null || _neuerBetrag <= 0) return;
+
+        var buchung = new Wechselgeld
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            Aktion = _neueAktion,
+            Betrag = _neuerBetrag,
+            BedienungId = _neueBedienungId,
+            VerkaufsstandId = _neuerStandId,
+            EmpfaengerName = _neuerEmpfaenger,
+            Bemerkung = _neueBemerkung,
+            Zeitpunkt = DateTime.Now
+        };
+
+        await Db.AddAsync(buchung);
+
+        _neuerBetrag = 0;
+        _neueBedienungId = null;
+        _neuerStandId = null;
+        _neuerEmpfaenger = null;
+        _neueBemerkung = null;
+
+        await LadeBuchungen();
+    }
+}

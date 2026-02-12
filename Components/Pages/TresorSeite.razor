@@ -1,0 +1,340 @@
+@page "/tresor"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Tresor-Barbestand - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-safe2 me-2"></i>Tresor-Barbestand</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-primary text-white">
+                <div class="card-body text-center">
+                    <div class="small">Barbestand (Saldo)</div>
+                    <div class="fs-2 fw-bold">@_saldo.ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="small">Einzahlungen gesamt</div>
+                    <div class="fs-2 fw-bold">@_einzahlungenGesamt.ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-danger text-white">
+                <div class="card-body text-center">
+                    <div class="small">Entnahmen gesamt</div>
+                    <div class="fs-2 fw-bold">@_entnahmenGesamt.ToString("C", _culture)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        @* === STUECKELUNGEN === *@
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-cash-coin me-2"></i>Stueckelungen im Tresor</span>
+                    <span class="badge bg-primary fs-6">@_bestandGesamt.ToString("C", _culture)</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (!_bestaende.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Stueckelungen erfasst.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Stueckelung</th>
+                                        <th class="text-center">Anzahl</th>
+                                        <th class="text-end">Wert</th>
+                                        <th class="text-end">Gesamt</th>
+                                        <th class="text-end">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var b in _bestaende.OrderByDescending(x => x.Wert))
+                                    {
+                                        <tr>
+                                            <td class="fw-bold">@b.Stueckelung</td>
+                                            <td class="text-center">
+                                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                                    <button class="btn btn-outline-secondary btn-sm px-2 py-0" @onclick="() => BestandAendern(b, -1)" disabled="@(b.Anzahl <= 0)">
+                                                        <i class="bi bi-dash"></i>
+                                                    </button>
+                                                    <span class="fw-bold mx-1" style="min-width:2rem;text-align:center;">@b.Anzahl</span>
+                                                    <button class="btn btn-outline-primary btn-sm px-2 py-0" @onclick="() => BestandAendern(b, 1)">
+                                                        <i class="bi bi-plus"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td class="text-end">@b.Wert.ToString("C", _culture)</td>
+                                            <td class="text-end fw-bold">@(b.Gesamt).ToString("C", _culture)</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-outline-danger btn-sm" @onclick="() => BestandLoeschen(b)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer bg-white">
+                    <div class="row g-2 align-items-end">
+                        <div class="col">
+                            <label class="form-label small">Bezeichnung</label>
+                            <input type="text" class="form-control form-control-sm" @bind="_neueStueckelung" placeholder="z.B. 1 EUR Muenzrolle" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label small">Wert (EUR)</label>
+                            <input type="number" class="form-control form-control-sm" step="0.01" min="0" @bind="_neuerWert" />
+                        </div>
+                        <div class="col-2">
+                            <label class="form-label small">Anzahl</label>
+                            <input type="number" class="form-control form-control-sm" min="0" @bind="_neueAnzahl" />
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary btn-sm" @onclick="StueckelungHinzufuegen"
+                                    disabled="@(string.IsNullOrWhiteSpace(_neueStueckelung) || _neuerWert <= 0)">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* === BEWEGUNGEN === *@
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-arrow-left-right me-2"></i>Neue Bewegung
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" id="typEin" value="Einzahlung"
+                                       checked="@(_neuerTyp == TresorBewegungTyp.Einzahlung)"
+                                       @onchange="() => _neuerTyp = TresorBewegungTyp.Einzahlung" />
+                                <label class="form-check-label text-success fw-bold" for="typEin">
+                                    <i class="bi bi-arrow-down-circle me-1"></i>Einzahlung
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" id="typAus" value="Entnahme"
+                                       checked="@(_neuerTyp == TresorBewegungTyp.Entnahme)"
+                                       @onchange="() => _neuerTyp = TresorBewegungTyp.Entnahme" />
+                                <label class="form-check-label text-danger fw-bold" for="typAus">
+                                    <i class="bi bi-arrow-up-circle me-1"></i>Entnahme
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Betrag</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control form-control-lg" step="0.01" min="0" @bind="_bewegungBetrag" />
+                            <span class="input-group-text">EUR</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Empfaenger / Quelle</label>
+                        <input type="text" class="form-control" @bind="_bewegungEmpfaenger" placeholder="z.B. DJ, Band, Reinigungskraft" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Verwendungszweck</label>
+                        <input type="text" class="form-control" @bind="_bewegungZweck" placeholder="z.B. Gage, Wechselgeld" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bemerkung</label>
+                        <input type="text" class="form-control" @bind="_bewegungBemerkung" />
+                    </div>
+                    <button class="btn w-100 btn-lg @(_neuerTyp == TresorBewegungTyp.Einzahlung ? "btn-success" : "btn-danger")"
+                            @onclick="BewegungErstellen"
+                            disabled="@(_bewegungBetrag <= 0)">
+                        <i class="bi @(_neuerTyp == TresorBewegungTyp.Einzahlung ? "bi-arrow-down-circle" : "bi-arrow-up-circle") me-2"></i>
+                        @(_neuerTyp == TresorBewegungTyp.Einzahlung ? "Einzahlung buchen" : "Entnahme buchen")
+                    </button>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-clock-history me-2"></i>Bewegungshistorie
+                </div>
+                <div class="card-body p-0">
+                    @if (!_bewegungen.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Bewegungen.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height:400px;overflow-y:auto;">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light" style="position:sticky;top:0;">
+                                    <tr>
+                                        <th>Zeit</th>
+                                        <th>Typ</th>
+                                        <th class="text-end">Betrag</th>
+                                        <th>Empfaenger / Zweck</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var bew in _bewegungen)
+                                    {
+                                        <tr>
+                                            <td class="small">@bew.Zeitpunkt.ToString("dd.MM. HH:mm")</td>
+                                            <td>
+                                                @if (bew.Typ == TresorBewegungTyp.Einzahlung)
+                                                {
+                                                    <span class="badge bg-success">Einzahlung</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Entnahme</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold">@bew.Betrag.ToString("C", _culture)</td>
+                                            <td class="small">
+                                                @if (!string.IsNullOrEmpty(bew.Empfaenger))
+                                                {
+                                                    <strong>@bew.Empfaenger</strong>
+                                                }
+                                                @if (!string.IsNullOrEmpty(bew.Verwendungszweck))
+                                                {
+                                                    <span class="text-muted"> - @bew.Verwendungszweck</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(bew.Bemerkung))
+                                                {
+                                                    <br /><span class="text-muted fst-italic">@bew.Bemerkung</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<TresorBestand> _bestaende = new();
+    private List<TresorBewegung> _bewegungen = new();
+    private decimal _saldo;
+    private decimal _einzahlungenGesamt;
+    private decimal _entnahmenGesamt;
+    private decimal _bestandGesamt => _bestaende.Sum(b => b.Wert * b.Anzahl);
+
+    private string _neueStueckelung = string.Empty;
+    private decimal _neuerWert;
+    private int _neueAnzahl = 1;
+
+    private TresorBewegungTyp _neuerTyp = TresorBewegungTyp.Entnahme;
+    private decimal _bewegungBetrag;
+    private string? _bewegungEmpfaenger;
+    private string? _bewegungZweck;
+    private string? _bewegungBemerkung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        if (_aktiveVeranstaltung == null) return;
+        var vid = _aktiveVeranstaltung.Id;
+        _bestaende = await Db.GetTresorBestandAsync(vid);
+        _bewegungen = await Db.GetTresorBewegungenAsync(vid);
+        _saldo = await Db.GetTresorSaldoAsync(vid);
+        _einzahlungenGesamt = _bewegungen.Where(b => b.Typ == TresorBewegungTyp.Einzahlung).Sum(b => b.Betrag);
+        _entnahmenGesamt = _bewegungen.Where(b => b.Typ == TresorBewegungTyp.Entnahme).Sum(b => b.Betrag);
+    }
+
+    private async Task StueckelungHinzufuegen()
+    {
+        if (_aktiveVeranstaltung == null || string.IsNullOrWhiteSpace(_neueStueckelung) || _neuerWert <= 0) return;
+
+        var bestand = new TresorBestand
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            Stueckelung = _neueStueckelung,
+            Wert = _neuerWert,
+            Anzahl = _neueAnzahl
+        };
+
+        await Db.AddAsync(bestand);
+        _neueStueckelung = string.Empty;
+        _neuerWert = 0;
+        _neueAnzahl = 1;
+        await LadeDaten();
+    }
+
+    private async Task BestandAendern(TresorBestand bestand, int delta)
+    {
+        bestand.Anzahl += delta;
+        if (bestand.Anzahl < 0) bestand.Anzahl = 0;
+        await Db.UpdateAsync(bestand);
+        await LadeDaten();
+    }
+
+    private async Task BestandLoeschen(TresorBestand bestand)
+    {
+        await Db.DeleteAsync<TresorBestand>(bestand.Id);
+        await LadeDaten();
+    }
+
+    private async Task BewegungErstellen()
+    {
+        if (_aktiveVeranstaltung == null || _bewegungBetrag <= 0) return;
+
+        var bewegung = new TresorBewegung
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            Typ = _neuerTyp,
+            Betrag = _bewegungBetrag,
+            Empfaenger = _bewegungEmpfaenger,
+            Verwendungszweck = _bewegungZweck,
+            Bemerkung = _bewegungBemerkung,
+            Zeitpunkt = DateTime.Now
+        };
+
+        await Db.AddAsync(bewegung);
+        _bewegungBetrag = 0;
+        _bewegungEmpfaenger = null;
+        _bewegungZweck = null;
+        _bewegungBemerkung = null;
+        await LadeDaten();
+    }
+}

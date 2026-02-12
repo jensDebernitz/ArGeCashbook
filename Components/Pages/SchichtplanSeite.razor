@@ -1,0 +1,219 @@
+@page "/schichtplan"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Schichtplan - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-clock-history me-2"></i>Schichtplan</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-bold">
+                Schichtplan - @_aktiveVeranstaltung.Name
+                <span class="text-muted ms-2">(@_aktiveVeranstaltung.Datum.ToString("dd.MM.yyyy"))</span>
+            </span>
+            <button class="btn btn-primary btn-sm" @onclick="NeuAnlegen">
+                <i class="bi bi-plus-lg me-1"></i>Neue Schicht
+            </button>
+        </div>
+        <div class="card-body p-0">
+            @if (_loading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary"></div>
+                </div>
+            }
+            else if (!_schichten.Any())
+            {
+                <div class="text-muted text-center py-4">Noch keine Schichten geplant.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Telefon</th>
+                                <th>Rolle</th>
+                                <th>Von</th>
+                                <th>Bis</th>
+                                <th>Bemerkung</th>
+                                <th class="text-end">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in _schichten.OrderBy(x => x.Von))
+                            {
+                                var istAktiv = s.Von <= DateTime.Now && s.Bis >= DateTime.Now;
+                                <tr class="@(istAktiv ? "table-success" : "")">
+                                    <td class="fw-bold">
+                                        @s.PersonName
+                                        @if (istAktiv)
+                                        {
+                                            <span class="badge bg-success ms-1">Aktiv</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(s.Telefon))
+                                        {
+                                            <a href="tel:@s.Telefon" class="text-decoration-none">
+                                                <i class="bi bi-telephone me-1"></i>@s.Telefon
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-info">@(s.Rolle ?? "Kasse")</span></td>
+                                    <td>@s.Von.ToString("dd.MM. HH:mm")</td>
+                                    <td>@s.Bis.ToString("dd.MM. HH:mm")</td>
+                                    <td class="text-muted small">@(s.Bemerkung ?? "-")</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(s)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(s)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editSchicht?.Id != null ? "Schicht bearbeiten" : "Neue Schicht")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editSchicht" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <InputText class="form-control" @bind-Value="_editSchicht!.PersonName" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Telefon</label>
+                            <InputText class="form-control" @bind-Value="_editSchicht!.Telefon" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Rolle</label>
+                            <InputText class="form-control" @bind-Value="_editSchicht!.Rolle" placeholder="z.B. Kasse, Aufsicht" />
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Von</label>
+                                <InputDate class="form-control" Type="InputDateType.DateTimeLocal" @bind-Value="_editSchicht!.Von" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bis</label>
+                                <InputDate class="form-control" Type="InputDateType.DateTimeLocal" @bind-Value="_editSchicht!.Bis" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bemerkung</label>
+                            <InputText class="form-control" @bind-Value="_editSchicht!.Bemerkung" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary">Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<Schicht> _schichten = new();
+    private bool _showForm;
+    private Schicht? _editSchicht;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        _loading = true;
+        if (_aktiveVeranstaltung != null)
+            _schichten = await Db.GetSchichtenAsync(_aktiveVeranstaltung.Id);
+        _loading = false;
+    }
+
+    private void NeuAnlegen()
+    {
+        var datum = _aktiveVeranstaltung?.Datum ?? DateTime.Today;
+        _editSchicht = new Schicht
+        {
+            VeranstaltungId = _aktiveVeranstaltung?.Id ?? 0,
+            Von = datum.Date.AddHours(18),
+            Bis = datum.Date.AddHours(22),
+            Rolle = "Kasse"
+        };
+        _showForm = true;
+    }
+
+    private void Bearbeiten(Schicht s)
+    {
+        _editSchicht = new Schicht
+        {
+            Id = s.Id,
+            VeranstaltungId = s.VeranstaltungId,
+            PersonName = s.PersonName,
+            Telefon = s.Telefon,
+            Von = s.Von,
+            Bis = s.Bis,
+            Rolle = s.Rolle,
+            Bemerkung = s.Bemerkung
+        };
+        _showForm = true;
+    }
+
+    private async Task Speichern()
+    {
+        if (_editSchicht == null) return;
+        if (_editSchicht.Id > 0)
+            await Db.UpdateAsync(_editSchicht);
+        else
+            await Db.AddAsync(_editSchicht);
+        _showForm = false;
+        await LadeDaten();
+    }
+
+    private async Task Loeschen(Schicht s)
+    {
+        if (s.Id == 0) return;
+        await Db.DeleteAsync<Schicht>(s.Id);
+        await LadeDaten();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

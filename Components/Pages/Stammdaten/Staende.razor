@@ -1,0 +1,168 @@
+@page "/stammdaten/staende"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Verkaufsstaende - ArGe Kassenbuch</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-shop me-2"></i>Verkaufsstaende</h1>
+    <button class="btn btn-primary" @onclick="NeuAnlegen">
+        <i class="bi bi-plus-lg me-1"></i>Neuer Stand
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <span class="fw-bold">Alle Verkaufsstaende</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else if (!_staende.Any())
+        {
+            <div class="text-muted text-center py-4">Noch keine Verkaufsstaende angelegt.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Beschreibung</th>
+                            <th>Waren</th>
+                            <th>Status</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var stand in _staende)
+                        {
+                            var warenCount = _waren.Count(w => w.VerkaufsstandId == stand.Id);
+                            <tr>
+                                <td class="fw-bold">@stand.Name</td>
+                                <td class="text-muted">@(stand.Beschreibung ?? "-")</td>
+                                <td><span class="badge bg-info">@warenCount Artikel</span></td>
+                                <td>
+                                    @if (stand.Aktiv)
+                                    {
+                                        <span class="badge bg-success">Aktiv</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inaktiv</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(stand)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(stand)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(15,15,35,0.6); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-gradient">
+                    <h5 class="modal-title"><i class="bi bi-shop me-2"></i>@(_editStand?.Id > 0 ? "Stand bearbeiten" : "Neuer Stand")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editStand" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <InputText class="form-control" @bind-Value="_editStand!.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <InputText class="form-control" @bind-Value="_editStand!.Beschreibung" />
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_editStand!.Aktiv" />
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Verkaufsstand> _staende = new();
+    private List<Ware> _waren = new();
+    private bool _showForm;
+    private Verkaufsstand? _editStand;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        _loading = true;
+        _staende = await Db.GetVerkaufsstaendeAsync();
+        _waren = await Db.GetWarenAsync();
+        _loading = false;
+    }
+
+    private void NeuAnlegen()
+    {
+        _editStand = new Verkaufsstand { Aktiv = true };
+        _showForm = true;
+    }
+
+    private void Bearbeiten(Verkaufsstand stand)
+    {
+        _editStand = new Verkaufsstand
+        {
+            Id = stand.Id,
+            Name = stand.Name,
+            Beschreibung = stand.Beschreibung,
+            Aktiv = stand.Aktiv
+        };
+        _showForm = true;
+    }
+
+    private async Task Speichern()
+    {
+        if (_editStand == null) return;
+        if (_editStand.Id > 0)
+            await Db.UpdateAsync(_editStand);
+        else
+            await Db.AddAsync(_editStand);
+        _showForm = false;
+        await LadeDaten();
+    }
+
+    private async Task Loeschen(Verkaufsstand stand)
+    {
+        if (stand.Id == 0) return;
+        await Db.DeleteAsync<Verkaufsstand>(stand.Id);
+        await LadeDaten();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

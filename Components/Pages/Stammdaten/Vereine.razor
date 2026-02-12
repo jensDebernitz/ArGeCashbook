@@ -1,0 +1,161 @@
+@page "/stammdaten/vereine"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Vereine - ArGe Kassenbuch</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-building me-2"></i>Vereine</h1>
+    <button class="btn btn-primary" @onclick="NeuerVerein">
+        <i class="bi bi-plus-lg me-1"></i>Neuer Verein
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <span class="fw-bold">Vereine der ArGe</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Kürzel</th>
+                            <th>Status</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var verein in _vereine)
+                        {
+                            <tr>
+                                <td>@verein.Name</td>
+                                <td><span class="badge bg-secondary">@verein.Kuerzel</span></td>
+                                <td>
+                                    @if (verein.Aktiv)
+                                    {
+                                        <span class="badge bg-success">Aktiv</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inaktiv</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(verein)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(verein)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(15,15,35,0.6); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-gradient">
+                    <h5 class="modal-title"><i class="bi bi-building me-2"></i>@(_editVerein?.Id > 0 ? "Verein bearbeiten" : "Neuer Verein")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editVerein" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <InputText class="form-control" @bind-Value="_editVerein!.Name" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kürzel</label>
+                            <InputText class="form-control" @bind-Value="_editVerein!.Kuerzel" />
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_editVerein!.Aktiv" />
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Verein> _vereine = new();
+    private bool _showForm;
+    private Verein? _editVerein;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeVereine();
+    }
+
+    private async Task LadeVereine()
+    {
+        _loading = true;
+        _vereine = await Db.GetVereineAsync();
+        _loading = false;
+    }
+
+    private void NeuerVerein()
+    {
+        _editVerein = new Verein { Aktiv = true };
+        _showForm = true;
+    }
+
+    private void Bearbeiten(Verein verein)
+    {
+        _editVerein = new Verein
+        {
+            Id = verein.Id,
+            Name = verein.Name,
+            Kuerzel = verein.Kuerzel,
+            Aktiv = verein.Aktiv
+        };
+        _showForm = true;
+    }
+
+    private async Task Speichern()
+    {
+        if (_editVerein == null) return;
+
+        if (_editVerein.Id > 0)
+            await Db.UpdateAsync(_editVerein);
+        else
+            await Db.AddAsync(_editVerein);
+
+        _showForm = false;
+        await LadeVereine();
+    }
+
+    private async Task Loeschen(Verein verein)
+    {
+        if (verein.Id == 0) return;
+        await Db.DeleteAsync<Verein>(verein.Id);
+        await LadeVereine();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

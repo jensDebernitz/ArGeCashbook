@@ -1,0 +1,307 @@
+@page "/verkauf"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Verkauf - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-receipt me-2"></i>Verkauf / Bons</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-plus-circle me-2"></i>Neuer Bon
+                    <span class="float-end badge bg-light text-dark">Nr. @_naechsteBonNr</span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Verkaufsstand</label>
+                        <select class="form-select" @onchange="StandGewaehlt">
+                            <option value="">-- Stand waehlen --</option>
+                            @foreach (var stand in _staende)
+                            {
+                                <option value="@stand.Id">@stand.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (_selectedStandId.HasValue)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Artikel hinzufuegen</label>
+                            <div class="row g-2">
+                                @foreach (var ware in _standWaren)
+                                {
+                                    <div class="col-6">
+                                        <button class="btn btn-outline-primary w-100 py-3 position-relative" @onclick="() => ArtikelHinzufuegen(ware)">
+                                            <div class="fw-bold">@ware.Name</div>
+                                            <div class="small">@ware.Preis.ToString("C", _culture)</div>
+                                            @{
+                                                var anzahl = _bonPositionen.FirstOrDefault(p => p.WareId == ware.Id)?.Anzahl ?? 0;
+                                            }
+                                            @if (anzahl > 0)
+                                            {
+                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                                    @anzahl
+                                                </span>
+                                            }
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_bonPositionen.Any())
+                    {
+                        <hr />
+                        <h6 class="fw-bold">Positionen</h6>
+                        <div class="list-group mb-3">
+                            @foreach (var pos in _bonPositionen)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">@pos.Anzahl x</span> @pos.WareName
+                                        <span class="text-muted ms-2">@pos.Einzelpreis.ToString("C", _culture)</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="fw-bold me-3">@pos.Gesamtpreis.ToString("C", _culture)</span>
+                                        <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => AnzahlReduzieren(pos)">
+                                            <i class="bi bi-dash"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => PositionEntfernen(pos)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-3">
+                            <span class="fs-5 fw-bold">Gesamt:</span>
+                            <span class="fs-4 fw-bold text-success">@_bonGesamt.ToString("C", _culture)</span>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success btn-lg" @onclick="BonErstellen">
+                                <i class="bi bi-check-circle me-2"></i>Bon erstellen
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="BonVerwerfen">
+                                <i class="bi bi-x-circle me-2"></i>Verwerfen
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold"><i class="bi bi-list-ul me-2"></i>Heutige Bons</span>
+                    <span class="badge bg-primary">@_bons.Count Bons</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (!_bons.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Bons erstellt.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Nr.</th>
+                                        <th>Zeit</th>
+                                        <th>Positionen</th>
+                                        <th class="text-end">Betrag</th>
+                                        <th class="text-end">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var bon in _bons.OrderByDescending(b => b.ErstelltAm))
+                                    {
+                                        <tr class="@(bon.Storniert ? "table-danger text-decoration-line-through" : "")">
+                                            <td><span class="badge bg-secondary">@bon.BonNummer</span></td>
+                                            <td>@bon.ErstelltAm.ToString("HH:mm:ss")</td>
+                                            <td>
+                                                @foreach (var pos in bon.Positionen)
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">@pos.Anzahl x @pos.WareName</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold">@bon.Gesamtbetrag.ToString("C", _culture)</td>
+                                            <td class="text-end">
+                                                @if (!bon.Storniert)
+                                                {
+                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => BonStornieren(bon)">
+                                                        <i class="bi bi-x-lg"></i> Storno
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Storniert</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                @if (_bons.Any())
+                {
+                    <div class="card-footer bg-white">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">Tageseinnahmen:</span>
+                            <span class="fw-bold text-success fs-5">
+                                @_bons.Where(b => !b.Storniert).Sum(b => b.Gesamtbetrag).ToString("C", _culture)
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_meldung))
+{
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+        <div class="toast show bg-success text-white">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>@_meldung
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<Verkaufsstand> _staende = new();
+    private List<Ware> _standWaren = new();
+    private List<Bon> _bons = new();
+    private List<BonPosition> _bonPositionen = new();
+    private int? _selectedStandId;
+    private int _naechsteBonNr = 1;
+    private decimal _bonGesamt => _bonPositionen.Sum(p => p.Gesamtpreis);
+    private string? _meldung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+
+        _staende = (await Db.GetVerkaufsstaendeAsync()).Where(s => s.Aktiv).ToList();
+
+        if (_aktiveVeranstaltung != null)
+        {
+            _bons = await Db.GetBonsAsync(_aktiveVeranstaltung.Id);
+            _naechsteBonNr = await Db.GetNaechsteBonNummerAsync(_aktiveVeranstaltung.Id);
+        }
+    }
+
+    private async Task StandGewaehlt(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var standId))
+        {
+            _selectedStandId = standId;
+            _standWaren = await Db.GetWarenByStandAsync(standId);
+        }
+        else
+        {
+            _selectedStandId = null;
+            _standWaren.Clear();
+        }
+        _bonPositionen.Clear();
+    }
+
+    private void ArtikelHinzufuegen(Ware ware)
+    {
+        var existing = _bonPositionen.FirstOrDefault(p => p.WareId == ware.Id);
+        if (existing != null)
+        {
+            existing.Anzahl++;
+        }
+        else
+        {
+            _bonPositionen.Add(new BonPosition
+            {
+                WareId = ware.Id,
+                WareName = ware.Name,
+                Anzahl = 1,
+                Einzelpreis = ware.Preis
+            });
+        }
+    }
+
+    private void AnzahlReduzieren(BonPosition pos)
+    {
+        pos.Anzahl--;
+        if (pos.Anzahl <= 0)
+            _bonPositionen.Remove(pos);
+    }
+
+    private void PositionEntfernen(BonPosition pos)
+    {
+        _bonPositionen.Remove(pos);
+    }
+
+    private async Task BonErstellen()
+    {
+        if (_aktiveVeranstaltung == null || !_bonPositionen.Any()) return;
+
+        var bon = new Bon
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            VerkaufsstandId = _selectedStandId,
+            BonNummer = _naechsteBonNr,
+            Positionen = new List<BonPosition>(_bonPositionen),
+            Gesamtbetrag = _bonGesamt,
+            ErstelltAm = DateTime.Now
+        };
+
+        await Db.AddAsync(bon);
+
+        _bons = await Db.GetBonsAsync(_aktiveVeranstaltung.Id);
+        _naechsteBonNr++;
+        _bonPositionen.Clear();
+
+        _meldung = $"Bon Nr. {bon.BonNummer} erstellt ({bon.Gesamtbetrag.ToString("C", _culture)})";
+        StateHasChanged();
+        _ = ClearMeldung();
+    }
+
+    private async Task BonStornieren(Bon bon)
+    {
+        bon.Storniert = true;
+        await Db.UpdateAsync(bon);
+        if (_aktiveVeranstaltung != null)
+            _bons = await Db.GetBonsAsync(_aktiveVeranstaltung.Id);
+    }
+
+    private void BonVerwerfen()
+    {
+        _bonPositionen.Clear();
+    }
+
+    private async Task ClearMeldung()
+    {
+        await Task.Delay(3000);
+        _meldung = null;
+        await InvokeAsync(StateHasChanged);
+    }
+}

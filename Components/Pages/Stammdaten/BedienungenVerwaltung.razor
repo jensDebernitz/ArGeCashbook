@@ -1,0 +1,168 @@
+@page "/stammdaten/bedienungen"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Bedienungen - ArGe Kassenbuch</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-people me-2"></i>Bedienungen</h1>
+    <button class="btn btn-primary" @onclick="NeuAnlegen">
+        <i class="bi bi-plus-lg me-1"></i>Neue Bedienung
+    </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <span class="fw-bold">Registrierte Bedienungen</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        }
+        else if (!_bedienungen.Any())
+        {
+            <div class="text-muted text-center py-4">Noch keine Bedienungen angelegt.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Telefon</th>
+                            <th>Status</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var bed in _bedienungen)
+                        {
+                            <tr>
+                                <td class="fw-bold">@bed.VollerName</td>
+                                <td>@(bed.Telefon ?? "-")</td>
+                                <td>
+                                    @if (bed.Aktiv)
+                                    {
+                                        <span class="badge bg-success">Aktiv</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inaktiv</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => Bearbeiten(bed)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => Loeschen(bed)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_showForm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(15,15,35,0.6); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-gradient">
+                    <h5 class="modal-title"><i class="bi bi-people me-2"></i>@(_editBedienung?.Id > 0 ? "Bedienung bearbeiten" : "Neue Bedienung")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseForm"></button>
+                </div>
+                <EditForm Model="_editBedienung" OnValidSubmit="Speichern">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Vorname</label>
+                            <InputText class="form-control" @bind-Value="_editBedienung!.Vorname" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nachname</label>
+                            <InputText class="form-control" @bind-Value="_editBedienung!.Nachname" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Telefon</label>
+                            <InputText class="form-control" @bind-Value="_editBedienung!.Telefon" />
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="_editBedienung!.Aktiv" />
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseForm">Abbrechen</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<Bedienung> _bedienungen = new();
+    private bool _showForm;
+    private Bedienung? _editBedienung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        _loading = true;
+        _bedienungen = await Db.GetBedienungenAsync();
+        _loading = false;
+    }
+
+    private void NeuAnlegen()
+    {
+        _editBedienung = new Bedienung { Aktiv = true };
+        _showForm = true;
+    }
+
+    private void Bearbeiten(Bedienung bed)
+    {
+        _editBedienung = new Bedienung
+        {
+            Id = bed.Id,
+            Vorname = bed.Vorname,
+            Nachname = bed.Nachname,
+            Telefon = bed.Telefon,
+            Aktiv = bed.Aktiv
+        };
+        _showForm = true;
+    }
+
+    private async Task Speichern()
+    {
+        if (_editBedienung == null) return;
+        if (_editBedienung.Id > 0)
+            await Db.UpdateAsync(_editBedienung);
+        else
+            await Db.AddAsync(_editBedienung);
+        _showForm = false;
+        await LadeDaten();
+    }
+
+    private async Task Loeschen(Bedienung bed)
+    {
+        if (bed.Id == 0) return;
+        await Db.DeleteAsync<Bedienung>(bed.Id);
+        await LadeDaten();
+    }
+
+    private void CloseForm() => _showForm = false;
+}

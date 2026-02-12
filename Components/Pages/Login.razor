@@ -1,0 +1,76 @@
+@page "/login"
+@layout ArgeKassenbuch.Components.Layout.EmptyLayout
+@attribute [AllowAnonymous]
+
+<PageTitle>Login - ArGe Kassenbuch</PageTitle>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-header">
+            <i class="bi bi-cash-stack"></i>
+            <h2>ArGe Kassenbuch</h2>
+        </div>
+        <div class="login-body">
+            @if (_error)
+            {
+                <div class="alert alert-danger py-2">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Falsches Passwort
+                </div>
+            }
+            <form method="post" action="/api/auth/login">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Passwort</label>
+                    <input type="password" name="passwort" class="form-control form-control-lg" placeholder="Passwort eingeben" autofocus required />
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Anmelden
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        padding: 1rem;
+    }
+    .login-card {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
+        width: 100%;
+        max-width: 400px;
+    }
+    .login-header {
+        background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+        color: white;
+        text-align: center;
+        padding: 2rem 1.5rem 1.5rem;
+    }
+    .login-header i {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .login-header h2 {
+        margin: 0;
+        font-weight: 800;
+        font-size: 1.5rem;
+    }
+    .login-body {
+        padding: 2rem 1.5rem;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ErrorParam { get; set; }
+
+    private bool _error => ErrorParam == "1";
+}

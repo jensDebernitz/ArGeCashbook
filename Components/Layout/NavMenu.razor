@@ -1,0 +1,126 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <i class="bi bi-cash-stack me-2"></i>ArGe Kassenbuch
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <i class="bi bi-speedometer2 me-2"></i> Dashboard
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 nav-section-header">
+            <span class="text-uppercase small text-muted">Veranstaltung</span>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="veranstaltungen">
+                <i class="bi bi-calendar-event me-2"></i> Veranstaltungen
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="verkauf">
+                <i class="bi bi-receipt me-2"></i> Verkauf / Bons
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="bedienung">
+                <i class="bi bi-person-workspace me-2"></i> Bedienungs-Modus
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 nav-section-header">
+            <span class="text-uppercase small text-muted">Kasse</span>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="kassenbuch">
+                <i class="bi bi-journal-text me-2"></i> Kassenbuch
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="wechselgeld">
+                <i class="bi bi-coin me-2"></i> Wechselgeld
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="safebags">
+                <i class="bi bi-safe me-2"></i> SafeBags
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="tresor">
+                <i class="bi bi-safe2 me-2"></i> Tresor-Barbestand
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="uebergabe">
+                <i class="bi bi-arrow-left-right me-2"></i> Übergabe
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 nav-section-header">
+            <span class="text-uppercase small text-muted">Planung</span>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="schichtplan">
+                <i class="bi bi-clock-history me-2"></i> Schichtplan
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 nav-section-header">
+            <span class="text-uppercase small text-muted">Verwaltung</span>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="stammdaten/waren">
+                <i class="bi bi-box-seam me-2"></i> Waren & Preise
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="stammdaten/staende">
+                <i class="bi bi-shop me-2"></i> Verkaufsstände
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="stammdaten/bedienungen">
+                <i class="bi bi-people me-2"></i> Bedienungen
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="stammdaten/vereine">
+                <i class="bi bi-building me-2"></i> Vereine
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="einstellungen">
+                <i class="bi bi-gear me-2"></i> Einstellungen
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3" style="margin-top:1rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:1rem;">
+            <a class="nav-link" href="/api/auth/logout" style="color:#ef476f;">
+                <i class="bi bi-box-arrow-left me-2"></i> Abmelden
+            </a>
+        </div>
+    </nav>
+</div>
+

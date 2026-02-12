@@ -1,0 +1,183 @@
+@page "/uebergabe"
+@rendermode InteractiveServer
+@inject KassenbuchService Db
+
+<PageTitle>Uebergabeprotokoll - ArGe Kassenbuch</PageTitle>
+
+<h1 class="mb-4"><i class="bi bi-arrow-left-right me-2"></i>Kassenuebergabe</h1>
+
+@if (_aktiveVeranstaltung == null)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktive Veranstaltung. Bitte zuerst unter <a href="veranstaltungen">Veranstaltungen</a> eine aktivieren.
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white fw-bold">
+                    <i class="bi bi-file-earmark-text me-2"></i>Neue Uebergabe erstellen
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info py-2 mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Aktuell im Tresor:</strong> @_anzahlSafeBagsImTresor SafeBags
+                        (@_safeBagGesamt.ToString("C", _culture))
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Uebergeben von</label>
+                            <input type="text" class="form-control" @bind="_uebergebenVon" placeholder="Name" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Uebergeben an</label>
+                            <input type="text" class="form-control" @bind="_uebergebenAn" placeholder="Name" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Anzahl SafeBags</label>
+                            <input type="number" class="form-control" @bind="_anzahlSafeBags" min="0" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Wechselgeldhoehe</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" step="0.01" @bind="_wechselgeldHoehe" min="0" />
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-check-lg mb-3">
+                        <input type="checkbox" class="form-check-input" @bind="_schluesselUebergeben" id="schluessel" />
+                        <label class="form-check-label fw-bold" for="schluessel">
+                            <i class="bi bi-key me-1"></i>Schluessel uebergeben
+                        </label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Bemerkung</label>
+                        <textarea class="form-control" rows="2" @bind="_bemerkung"></textarea>
+                    </div>
+
+                    <button class="btn btn-primary w-100 btn-lg" @onclick="UebergabeErstellen"
+                            disabled="@(string.IsNullOrWhiteSpace(_uebergebenVon) || string.IsNullOrWhiteSpace(_uebergebenAn))">
+                        <i class="bi bi-check-circle me-2"></i>Uebergabe protokollieren
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-clock-history me-2"></i>Uebergabe-Protokolle
+                </div>
+                <div class="card-body p-0">
+                    @if (!_protokolle.Any())
+                    {
+                        <div class="text-muted text-center py-4">Noch keine Uebergaben protokolliert.</div>
+                    }
+                    else
+                    {
+                        @foreach (var p in _protokolle.OrderByDescending(x => x.Zeitpunkt))
+                        {
+                            <div class="border-bottom p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <span class="fw-bold">@p.UebergebenVon</span>
+                                        <i class="bi bi-arrow-right mx-2"></i>
+                                        <span class="fw-bold">@p.UebergebenAn</span>
+                                    </div>
+                                    <span class="text-muted small">@p.Zeitpunkt.ToString("dd.MM.yyyy HH:mm")</span>
+                                </div>
+                                <div class="d-flex gap-3 small">
+                                    <span><i class="bi bi-safe me-1"></i>@p.AnzahlSafeBags SafeBags</span>
+                                    <span><i class="bi bi-coin me-1"></i>@p.WechselgeldHoehe.ToString("C", _culture)</span>
+                                    @if (p.SchluesselUebergeben)
+                                    {
+                                        <span class="text-success"><i class="bi bi-key me-1"></i>Schluessel</span>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrEmpty(p.Bemerkung))
+                                {
+                                    <div class="text-muted small mt-1">
+                                        <i class="bi bi-chat-text me-1"></i>@p.Bemerkung
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo _culture = new("de-DE");
+    private Veranstaltung? _aktiveVeranstaltung;
+    private List<Uebergabeprotokoll> _protokolle = new();
+    private int _anzahlSafeBagsImTresor;
+    private decimal _safeBagGesamt;
+
+    private string _uebergebenVon = string.Empty;
+    private string _uebergebenAn = string.Empty;
+    private int _anzahlSafeBags;
+    private decimal _wechselgeldHoehe;
+    private bool _schluesselUebergeben = true;
+    private string? _bemerkung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var einstellungen = await Db.GetEinstellungenAsync();
+        if (einstellungen.AktiveVeranstaltungId.HasValue)
+            _aktiveVeranstaltung = await Db.GetVeranstaltungAsync(einstellungen.AktiveVeranstaltungId.Value);
+        await LadeDaten();
+    }
+
+    private async Task LadeDaten()
+    {
+        if (_aktiveVeranstaltung == null) return;
+        var vid = _aktiveVeranstaltung.Id;
+        _protokolle = await Db.GetUebergabeprotokolleAsync(vid);
+
+        var safeBags = await Db.GetSafeBagsAsync(vid);
+        _anzahlSafeBagsImTresor = safeBags.Count(s => s.ImTresor);
+        _safeBagGesamt = safeBags.Where(s => s.ImTresor).Sum(s => s.Betrag);
+        _anzahlSafeBags = _anzahlSafeBagsImTresor;
+    }
+
+    private async Task UebergabeErstellen()
+    {
+        if (_aktiveVeranstaltung == null) return;
+        if (string.IsNullOrWhiteSpace(_uebergebenVon) || string.IsNullOrWhiteSpace(_uebergebenAn)) return;
+
+        var protokoll = new Uebergabeprotokoll
+        {
+            VeranstaltungId = _aktiveVeranstaltung.Id,
+            Zeitpunkt = DateTime.Now,
+            UebergebenVon = _uebergebenVon,
+            UebergebenAn = _uebergebenAn,
+            AnzahlSafeBags = _anzahlSafeBags,
+            WechselgeldHoehe = _wechselgeldHoehe,
+            SchluesselUebergeben = _schluesselUebergeben,
+            Bemerkung = _bemerkung
+        };
+
+        await Db.AddAsync(protokoll);
+
+        _uebergebenVon = string.Empty;
+        _uebergebenAn = string.Empty;
+        _wechselgeldHoehe = 0;
+        _schluesselUebergeben = true;
+        _bemerkung = null;
+
+        await LadeDaten();
+    }
+}

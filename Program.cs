@@ -26,7 +26,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromHours(24);
         options.SlidingExpiration = true;
     });
-builder.Services.AddAuthorization();
+builder.WebHost.UseUrls("http://localhost:8000");
 builder.Services.AddCascadingAuthenticationState();
 
 // Add services to the container.

@@ -1,0 +1,60 @@
+name: Debug Docker Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Show files
+      run: |
+        echo "Current directory:"
+        pwd
+        echo "Files:"
+        ls -la
+        
+    - name: Check Dockerfile
+      run: |
+        echo "Dockerfile content:"
+        cat Dockerfile
+        
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Test Docker Hub credentials
+      run: |
+        echo "Testing Docker Hub login..."
+        echo ${{ secrets.DOCKER_USERNAME }}
+        if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+          echo "DOCKER_USERNAME secret is missing!"
+          exit 1
+        fi
+        if [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
+          echo "DOCKER_PASSWORD secret is missing!"
+          exit 1
+        fi
+        
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        
+    - name: Build image (no push)
+      run: |
+        echo "Building Docker image..."
+        docker build -t jensdebernitz/arge-cashbook:test .
+        docker images | grep arge-cashbook
+        
+    - name: Try to push
+      run: |
+        echo "Attempting to push test image..."
+        docker push jensdebernitz/arge-cashbook:test || echo "Push failed!"

@@ -1,0 +1,64 @@
+name: Deploy to Debian Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+    
+    - name: Publish
+      run: dotnet publish ArgeKassenbuch.csproj -c Release -o ./publish --self-contained false
+    
+    - name: Deploy via SSH
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        source: "publish/*"
+        target: "/tmp/kassenbuch-deploy"
+        strip_components: 1
+    
+    - name: Restart Service
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DEPLOY_HOST }}
+        username: ${{ secrets.DEPLOY_USER }}
+        key: ${{ secrets.DEPLOY_SSH_KEY }}
+        port: ${{ secrets.DEPLOY_PORT || 22 }}
+        script: |
+          # App-Verzeichnis sicherstellen
+          sudo mkdir -p /opt/kassenbuch
+          
+          # Service stoppen
+          sudo systemctl stop kassenbuch.service || true
+          
+          # Dateien kopieren (wwwroot beibehalten falls vorhanden)
+          sudo rsync -a --delete \
+            --exclude 'appsettings.Production.json' \
+            /tmp/kassenbuch-deploy/ /opt/kassenbuch/
+          
+          # Berechtigungen setzen
+          sudo chown -R kassenbuch:kassenbuch /opt/kassenbuch
+          
+          # Service starten
+          sudo systemctl start kassenbuch.service
+          
+          # Aufräumen
+          rm -rf /tmp/kassenbuch-deploy
+          
+          # Status prüfen
+          sleep 3
+          sudo systemctl is-active kassenbuch.service

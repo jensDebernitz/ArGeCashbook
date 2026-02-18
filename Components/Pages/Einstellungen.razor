@@ -1,6 +1,7 @@
 @page "/einstellungen"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin")]
 
 <PageTitle>Einstellungen - ArGe Kassenbuch</PageTitle>
 
@@ -62,7 +63,7 @@ else if (_einstellungen != null)
                     }
 
                     <button class="btn btn-danger" @onclick="PasswortAendern">
-                        <i class="bi bi-key me-2"></i>Passwort ändern
+                        <i class="bi bi-key me-2"></i>Passwort ï¿½ndern
                     </button>
                 </div>
             </div>

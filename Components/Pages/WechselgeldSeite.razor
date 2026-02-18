@@ -1,6 +1,7 @@
 @page "/wechselgeld"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin,Kassenwart,Aufsicht")]
 
 <PageTitle>Wechselgeld - ArGe Kassenbuch</PageTitle>
 

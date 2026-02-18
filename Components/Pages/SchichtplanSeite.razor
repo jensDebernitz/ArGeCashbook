@@ -1,6 +1,7 @@
 @page "/schichtplan"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin,Kassenwart,Aufsicht,Bedienung,Leserecht")]
 
 <PageTitle>Schichtplan - ArGe Kassenbuch</PageTitle>
 

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @layout ArgeKassenbuch.Components.Layout.EmptyLayout
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin,Kassenwart,Bedienung")]
 @inject NavigationManager Nav
 
 <PageTitle>Bedienungs-Modus - ArGe Kassenbuch</PageTitle>

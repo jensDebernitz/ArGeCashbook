@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 builder.Services.AddScoped<KassenbuchService>();
+builder.Services.AddScoped<BenutzerService>();
 
 // Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -39,9 +40,11 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
     var service = scope.ServiceProvider.GetRequiredService<KassenbuchService>();
     await service.SeedDefaultDataAsync();
+    var benutzerService = scope.ServiceProvider.GetRequiredService<BenutzerService>();
+    await benutzerService.SeedDefaultAdminAsync();
 }
 
 // Configure the HTTP request pipeline.
@@ -56,18 +59,22 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 // Login endpoint
-app.MapPost("/api/auth/login", async (HttpContext context, KassenbuchService db) =>
+app.MapPost("/api/auth/login", async (HttpContext context, BenutzerService benutzerService) =>
 {
     var form = await context.Request.ReadFormAsync();
+    var benutzername = form["benutzername"].ToString();
     var passwort = form["passwort"].ToString();
-    var einstellungen = await db.GetEinstellungenAsync();
 
-    if (passwort == einstellungen.AdminPasswort)
+    var benutzer = await benutzerService.LoginAsync(benutzername, passwort);
+
+    if (benutzer != null)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, "Admin"),
-            new(ClaimTypes.Role, "Admin")
+            new(ClaimTypes.Name, benutzer.Anzeigename),
+            new(ClaimTypes.NameIdentifier, benutzer.Id.ToString()),
+            new(ClaimTypes.Role, benutzer.Rolle.ToString()),
+            new("Benutzername", benutzer.Benutzername)
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);

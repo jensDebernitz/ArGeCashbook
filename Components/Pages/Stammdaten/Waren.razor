@@ -1,6 +1,7 @@
 @page "/stammdaten/waren"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin")]
 
 <PageTitle>Waren und Preise - ArGe Kassenbuch</PageTitle>
 

@@ -14,13 +14,17 @@
             @if (_error)
             {
                 <div class="alert alert-danger py-2">
-                    <i class="bi bi-exclamation-triangle me-2"></i>Falsches Passwort
+                    <i class="bi bi-exclamation-triangle me-2"></i>Benutzername oder Passwort falsch
                 </div>
             }
             <form method="post" action="/api/auth/login">
                 <div class="mb-3">
+                    <label class="form-label fw-bold">Benutzername</label>
+                    <input type="text" name="benutzername" class="form-control form-control-lg" placeholder="Benutzername eingeben" autofocus required />
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-bold">Passwort</label>
-                    <input type="password" name="passwort" class="form-control form-control-lg" placeholder="Passwort eingeben" autofocus required />
+                    <input type="password" name="passwort" class="form-control form-control-lg" placeholder="Passwort eingeben" required />
                 </div>
                 <button type="submit" class="btn btn-primary btn-lg w-100">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Anmelden
@@ -36,19 +40,37 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 25%, #ede9fe 50%, #fce7f3 75%, #dbeafe 100%);
+        background-attachment: fixed;
         padding: 1rem;
     }
     .login-card {
-        background: white;
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
         border-radius: 1.5rem;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
         overflow: hidden;
         width: 100%;
         max-width: 400px;
+        position: relative;
+    }
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+        pointer-events: none;
     }
     .login-header {
-        background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+        background: rgba(67, 97, 238, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         color: white;
         text-align: center;
         padding: 2rem 1.5rem 1.5rem;
@@ -57,11 +79,13 @@
         font-size: 3rem;
         margin-bottom: 0.5rem;
         display: block;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
     }
     .login-header h2 {
         margin: 0;
         font-weight: 800;
         font-size: 1.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
     .login-body {
         padding: 2rem 1.5rem;

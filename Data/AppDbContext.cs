@@ -24,6 +24,8 @@ public class AppDbContext : DbContext
     public DbSet<AppEinstellungen> AppEinstellungen => Set<AppEinstellungen>();
     public DbSet<TresorBestand> TresorBestaende => Set<TresorBestand>();
     public DbSet<TresorBewegung> TresorBewegungen => Set<TresorBewegung>();
+    public DbSet<Benutzer> Benutzer => Set<Benutzer>();
+    public DbSet<BenutzerEinladung> BenutzerEinladungen => Set<BenutzerEinladung>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,5 +78,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TresorBewegung>()
             .Property(t => t.Typ)
             .HasConversion<string>();
+
+        // Benutzer
+        modelBuilder.Entity<Benutzer>()
+            .HasIndex(b => b.Benutzername)
+            .IsUnique();
+        modelBuilder.Entity<Benutzer>()
+            .Property(b => b.Rolle)
+            .HasConversion<string>();
+
+        // BenutzerEinladung
+        modelBuilder.Entity<BenutzerEinladung>()
+            .HasIndex(e => e.Token)
+            .IsUnique();
     }
 }

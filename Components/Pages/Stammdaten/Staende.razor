@@ -1,6 +1,7 @@
 @page "/stammdaten/staende"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin")]
 
 <PageTitle>Verkaufsstaende - ArGe Kassenbuch</PageTitle>
 

@@ -1,6 +1,7 @@
 @page "/veranstaltungen"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin,Kassenwart")]
 
 <PageTitle>Veranstaltungen - ArGe Kassenbuch</PageTitle>
 

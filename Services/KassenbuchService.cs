@@ -35,7 +35,7 @@ public class KassenbuchService
 
     // === Vereine ===
     public async Task<List<Verein>> GetVereineAsync()
-        => await _db.Vereine.ToListAsync();
+        => await _db.Vereine.AsNoTracking().ToListAsync();
 
     // === Veranstaltungen ===
     public async Task<List<Veranstaltung>> GetVeranstaltungenAsync()

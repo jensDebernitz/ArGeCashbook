@@ -1,0 +1,210 @@
+@page "/einladung/{Token}"
+@layout ArgeKassenbuch.Components.Layout.EmptyLayout
+@rendermode InteractiveServer
+@inject BenutzerService BenutzerSvc
+@inject NavigationManager Nav
+@attribute [AllowAnonymous]
+
+<PageTitle>Passwort festlegen - ArGe Kassenbuch</PageTitle>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-header">
+            <i class="bi bi-shield-lock"></i>
+            <h2>Passwort festlegen</h2>
+        </div>
+        <div class="login-body">
+            @if (_loading)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Laden...</span>
+                    </div>
+                </div>
+            }
+            else if (_ungueltig)
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Dieser Einladungslink ist ungültig oder abgelaufen.
+                </div>
+                <a href="/login" class="btn btn-primary w-100">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>Zum Login
+                </a>
+            }
+            else if (_erfolg)
+            {
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Passwort wurde erfolgreich gesetzt! Du kannst dich jetzt anmelden.
+                </div>
+                <a href="/login" class="btn btn-success w-100">
+                    <i class="bi bi-box-arrow-in-right me-1"></i>Jetzt anmelden
+                </a>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <div class="alert alert-info py-2">
+                        <i class="bi bi-person me-1"></i>
+                        Willkommen, <strong>@_benutzer?.Anzeigename</strong>!
+                        Bitte lege dein Passwort fest.
+                    </div>
+                </div>
+
+                @if (_fehler != null)
+                {
+                    <div class="alert alert-danger py-2">
+                        <i class="bi bi-exclamation-triangle me-2"></i>@_fehler
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Benutzername</label>
+                    <input type="text" class="form-control form-control-lg" value="@_benutzer?.Benutzername" disabled />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Neues Passwort</label>
+                    <input type="password" class="form-control form-control-lg" @bind="_passwort" placeholder="Passwort eingeben" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Passwort bestätigen</label>
+                    <input type="password" class="form-control form-control-lg" @bind="_passwortBestaetigung" placeholder="Passwort wiederholen" />
+                </div>
+                <button class="btn btn-primary btn-lg w-100" @onclick="PasswortSetzen" disabled="@_speichert">
+                    @if (_speichert)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    <i class="bi bi-check-lg me-1"></i>Passwort festlegen
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 25%, #ede9fe 50%, #fce7f3 75%, #dbeafe 100%);
+        background-attachment: fixed;
+        padding: 1rem;
+    }
+    .login-card {
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        overflow: hidden;
+        width: 100%;
+        max-width: 420px;
+        position: relative;
+    }
+    .login-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+        pointer-events: none;
+    }
+    .login-header {
+        background: rgba(67, 97, 238, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        text-align: center;
+        padding: 2rem 1.5rem 1.5rem;
+    }
+    .login-header i {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+        display: block;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+    }
+    .login-header h2 {
+        margin: 0;
+        font-weight: 800;
+        font-size: 1.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .login-body {
+        padding: 2rem 1.5rem;
+    }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private Benutzer? _benutzer;
+    private bool _loading = true;
+    private bool _ungueltig;
+    private bool _erfolg;
+    private bool _speichert;
+    private string? _fehler;
+    private string _passwort = "";
+    private string _passwortBestaetigung = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _ungueltig = true;
+            _loading = false;
+            return;
+        }
+
+        _benutzer = await BenutzerSvc.GetBenutzerByEinladungAsync(Token);
+        if (_benutzer == null)
+        {
+            _ungueltig = true;
+        }
+
+        _loading = false;
+    }
+
+    private async Task PasswortSetzen()
+    {
+        _fehler = null;
+
+        if (string.IsNullOrWhiteSpace(_passwort))
+        {
+            _fehler = "Bitte ein Passwort eingeben.";
+            return;
+        }
+
+        if (_passwort.Length < 4)
+        {
+            _fehler = "Das Passwort muss mindestens 4 Zeichen lang sein.";
+            return;
+        }
+
+        if (_passwort != _passwortBestaetigung)
+        {
+            _fehler = "Die Passwörter stimmen nicht überein.";
+            return;
+        }
+
+        _speichert = true;
+        var erfolg = await BenutzerSvc.PasswortPerEinladungSetzenAsync(Token, _passwort);
+        _speichert = false;
+
+        if (erfolg)
+        {
+            _erfolg = true;
+        }
+        else
+        {
+            _fehler = "Einladungslink ist ungültig oder abgelaufen.";
+            _ungueltig = true;
+        }
+    }
+}

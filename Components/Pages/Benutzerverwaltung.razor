@@ -1,0 +1,396 @@
+@page "/benutzerverwaltung"
+@rendermode InteractiveServer
+@inject BenutzerService BenutzerSvc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Benutzerverwaltung - ArGe Kassenbuch</PageTitle>
+
+<h3 class="mb-4"><i class="bi bi-people-fill me-2"></i>Benutzerverwaltung</h3>
+
+@if (_meldung != null)
+{
+    <div class="alert @(_meldungTyp) alert-dismissible fade show" role="alert">
+        @_meldung
+        <button type="button" class="btn-close" @onclick="() => _meldung = null"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-person-plus me-2"></i>Neuen Benutzer anlegen</span>
+        <button class="btn btn-sm btn-outline-primary" @onclick="ToggleNeuerBenutzer">
+            <i class="bi @(_neuerBenutzerSichtbar ? "bi-chevron-up" : "bi-chevron-down")"></i>
+        </button>
+    </div>
+    @if (_neuerBenutzerSichtbar)
+    {
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Benutzername</label>
+                    <input type="text" class="form-control" @bind="_neuBenutzername" placeholder="z.B. max.muster" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Anzeigename</label>
+                    <input type="text" class="form-control" @bind="_neuAnzeigename" placeholder="z.B. Max Mustermann" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Rolle</label>
+                    <select class="form-select" @bind="_neuRolle">
+                        @foreach (var rolle in Enum.GetValues<BenutzerRolle>())
+                        {
+                            <option value="@rolle">@rolle</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-success w-100" @onclick="BenutzerAnlegen">
+                        <i class="bi bi-plus-lg me-1"></i>Anlegen & Einladungslink erzeugen
+                    </button>
+                </div>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>@BenutzerService.GetRollenBeschreibung(_neuRolle)
+                </small>
+            </div>
+
+            @if (_einladungsLink != null)
+            {
+                <div class="alert alert-success mt-3 mb-0">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <i class="bi bi-link-45deg me-1"></i>
+                            <strong>Einladungslink:</strong>
+                        </div>
+                        <button class="btn btn-sm btn-outline-success" @onclick="EinladungsLinkKopieren">
+                            <i class="bi bi-clipboard me-1"></i>Kopieren
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <code class="user-select-all" style="word-break:break-all;">@_einladungsLink</code>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        <i class="bi bi-clock me-1"></i>Gültig für 72 Stunden. Der Benutzer muss über diesen Link sein Passwort festlegen.
+                    </small>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list-ul me-2"></i>Benutzer (@(_benutzer?.Count ?? 0))
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Benutzername</th>
+                        <th>Anzeigename</th>
+                        <th>Rolle</th>
+                        <th>Status</th>
+                        <th>Letzter Login</th>
+                        <th>Erstellt</th>
+                        <th class="text-end">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_benutzer != null)
+                    {
+                        @foreach (var b in _benutzer)
+                        {
+                            <tr>
+                                <td><code>@b.Benutzername</code></td>
+                                <td>
+                                    @if (_editId == b.Id)
+                                    {
+                                        <input type="text" class="form-control form-control-sm" @bind="_editAnzeigename" />
+                                    }
+                                    else
+                                    {
+                                        @b.Anzeigename
+                                    }
+                                </td>
+                                <td>
+                                    @if (_editId == b.Id)
+                                    {
+                                        <select class="form-select form-select-sm" @bind="_editRolle">
+                                            @foreach (var rolle in Enum.GetValues<BenutzerRolle>())
+                                            {
+                                                <option value="@rolle">@rolle</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge @GetRolleBadgeClass(b.Rolle)">@b.Rolle</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (_editId == b.Id)
+                                    {
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" @bind="_editAktiv" />
+                                            <label class="form-check-label">@(_editAktiv ? "Aktiv" : "Inaktiv")</label>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge @(b.Aktiv ? "bg-success" : "bg-secondary")">
+                                            @(b.Aktiv ? "Aktiv" : "Inaktiv")
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (b.LetzterLogin.HasValue)
+                                    {
+                                        @b.LetzterLogin.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Noch nie</span>
+                                    }
+                                </td>
+                                <td>@b.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                                <td class="text-end">
+                                    @if (_editId == b.Id)
+                                    {
+                                        <button class="btn btn-sm btn-success me-1" @onclick="SpeichernEdit">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary" @onclick="AbbrechenEdit">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(b)" title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success me-1" @onclick="() => NeueEinladungErstellen(b)" title="Neuen Einladungslink erzeugen">
+                                            <i class="bi bi-link-45deg"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => StartPasswortAendern(b)" title="Passwort ändern">
+                                            <i class="bi bi-key"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => BenutzerLoeschen(b)" title="Löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                            @if (_passwortAendernId == b.Id)
+                            {
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="d-flex align-items-center gap-2 p-2 bg-light rounded">
+                                            <i class="bi bi-key text-warning"></i>
+                                            <span class="fw-bold">Neues Passwort für @b.Anzeigename:</span>
+                                            <input type="password" class="form-control form-control-sm" style="max-width:250px" @bind="_neuesPasswort" placeholder="Neues Passwort" />
+                                            <button class="btn btn-sm btn-warning" @onclick="PasswortSpeichern">
+                                                <i class="bi bi-check-lg me-1"></i>Speichern
+                                            </button>
+                                            <button class="btn btn-sm btn-secondary" @onclick="() => _passwortAendernId = null">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-shield-lock me-2"></i>Rollen-Übersicht
+    </div>
+    <div class="card-body">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Rolle</th>
+                    <th>Berechtigungen</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rolle in Enum.GetValues<BenutzerRolle>())
+                {
+                    <tr>
+                        <td><span class="badge @GetRolleBadgeClass(rolle)">@rolle</span></td>
+                        <td>@BenutzerService.GetRollenBeschreibung(rolle)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<Benutzer>? _benutzer;
+    private string? _meldung;
+    private string _meldungTyp = "alert-success";
+
+    // Neuer Benutzer
+    private bool _neuerBenutzerSichtbar = false;
+    private string _neuBenutzername = "";
+    private string _neuAnzeigename = "";
+    private BenutzerRolle _neuRolle = BenutzerRolle.Bedienung;
+    private string? _einladungsLink;
+
+    // Edit
+    private int? _editId;
+    private string _editAnzeigename = "";
+    private BenutzerRolle _editRolle;
+    private bool _editAktiv;
+
+    // Passwort ändern
+    private int? _passwortAendernId;
+    private string _neuesPasswort = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadeBenutzer();
+    }
+
+    private async Task LadeBenutzer()
+    {
+        _benutzer = await BenutzerSvc.GetAlleBenutzerAsync();
+    }
+
+    private void ToggleNeuerBenutzer()
+    {
+        _neuerBenutzerSichtbar = !_neuerBenutzerSichtbar;
+    }
+
+    private async Task BenutzerAnlegen()
+    {
+        _einladungsLink = null;
+
+        if (string.IsNullOrWhiteSpace(_neuBenutzername))
+        {
+            ZeigeMeldung("Benutzername ist ein Pflichtfeld.", "alert-danger");
+            return;
+        }
+
+        if (await BenutzerSvc.BenutzerExistiertAsync(_neuBenutzername.ToLower().Trim()))
+        {
+            ZeigeMeldung($"Benutzername '{_neuBenutzername}' existiert bereits.", "alert-danger");
+            return;
+        }
+
+        var anzeigename = string.IsNullOrWhiteSpace(_neuAnzeigename) ? _neuBenutzername : _neuAnzeigename;
+        // Zufälliges Einmal-Passwort (Benutzer muss über Einladungslink sein echtes Passwort setzen)
+        var tempPasswort = Guid.NewGuid().ToString();
+        var benutzer = await BenutzerSvc.ErstelleBenutzerAsync(_neuBenutzername, tempPasswort, anzeigename, _neuRolle);
+
+        // Einladungslink erzeugen
+        var einladung = await BenutzerSvc.ErstelleEinladungAsync(benutzer.Id);
+        _einladungsLink = $"{Nav.BaseUri}einladung/{einladung.Token}";
+
+        ZeigeMeldung($"Benutzer '{_neuBenutzername}' wurde angelegt. Einladungslink wurde erzeugt.", "alert-success");
+        _neuBenutzername = "";
+        _neuAnzeigename = "";
+        _neuRolle = BenutzerRolle.Bedienung;
+        await LadeBenutzer();
+    }
+
+    private async Task NeueEinladungErstellen(Benutzer b)
+    {
+        var einladung = await BenutzerSvc.ErstelleEinladungAsync(b.Id);
+        _einladungsLink = $"{Nav.BaseUri}einladung/{einladung.Token}";
+        _neuerBenutzerSichtbar = true;
+        ZeigeMeldung($"Neuer Einladungslink für '{b.Anzeigename}' wurde erzeugt.", "alert-success");
+    }
+
+    private async Task EinladungsLinkKopieren()
+    {
+        if (_einladungsLink != null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _einladungsLink);
+            ZeigeMeldung("Einladungslink wurde in die Zwischenablage kopiert.", "alert-success");
+        }
+    }
+
+    private void StartEdit(Benutzer b)
+    {
+        _editId = b.Id;
+        _editAnzeigename = b.Anzeigename;
+        _editRolle = b.Rolle;
+        _editAktiv = b.Aktiv;
+        _passwortAendernId = null;
+    }
+
+    private void AbbrechenEdit()
+    {
+        _editId = null;
+    }
+
+    private async Task SpeichernEdit()
+    {
+        if (_editId.HasValue)
+        {
+            await BenutzerSvc.AktualisiereBenutzerAsync(_editId.Value, _editAnzeigename, _editRolle, _editAktiv);
+            ZeigeMeldung("Benutzer wurde aktualisiert.", "alert-success");
+            _editId = null;
+            await LadeBenutzer();
+        }
+    }
+
+    private void StartPasswortAendern(Benutzer b)
+    {
+        _passwortAendernId = b.Id;
+        _neuesPasswort = "";
+        _editId = null;
+    }
+
+    private async Task PasswortSpeichern()
+    {
+        if (_passwortAendernId.HasValue && !string.IsNullOrWhiteSpace(_neuesPasswort))
+        {
+            await BenutzerSvc.PasswortAendernAsync(_passwortAendernId.Value, _neuesPasswort);
+            ZeigeMeldung("Passwort wurde geändert.", "alert-success");
+            _passwortAendernId = null;
+            _neuesPasswort = "";
+        }
+    }
+
+    private async Task BenutzerLoeschen(Benutzer b)
+    {
+        var erfolg = await BenutzerSvc.LoescheBenutzerAsync(b.Id);
+        if (erfolg)
+        {
+            ZeigeMeldung($"Benutzer '{b.Benutzername}' wurde gelöscht.", "alert-success");
+            await LadeBenutzer();
+        }
+        else
+        {
+            ZeigeMeldung("Löschen fehlgeschlagen. Der letzte Admin kann nicht gelöscht werden.", "alert-danger");
+        }
+    }
+
+    private void ZeigeMeldung(string text, string typ)
+    {
+        _meldung = text;
+        _meldungTyp = typ;
+    }
+
+    private static string GetRolleBadgeClass(BenutzerRolle rolle) => rolle switch
+    {
+        BenutzerRolle.Admin => "bg-danger",
+        BenutzerRolle.Kassenwart => "bg-primary",
+        BenutzerRolle.Aufsicht => "bg-warning text-dark",
+        BenutzerRolle.Bedienung => "bg-info text-dark",
+        BenutzerRolle.Leserecht => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

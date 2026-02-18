@@ -1,6 +1,7 @@
 @page "/verkauf"
 @rendermode InteractiveServer
 @inject KassenbuchService Db
+@attribute [Authorize(Roles = "Admin,Kassenwart,Bedienung")]
 
 <PageTitle>Verkauf - ArGe Kassenbuch</PageTitle>
 
